@@ -1,0 +1,4 @@
+.DS_Store
+.trash
+dist
+node_modules
