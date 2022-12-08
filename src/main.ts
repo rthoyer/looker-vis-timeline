@@ -1,16 +1,21 @@
 import { Looker, VisualizationDefinition, LookerChartUtils, Cell } from './types'
+import Chart, { ChartType} from 'chart.js/auto'
+
 
 declare var looker: Looker
 declare var LookerCharts: LookerChartUtils
+const lineChartType: ChartType = "bar"
+const indexAxis: "y" | "x" | undefined = 'y'
+const x_scale_position: "top" | "left" | "right" | "bottom" | "center" = 'top'
 
 interface TimelineVisualization extends VisualizationDefinition {
   _timeline?: any
 }
 
-const vis: TimelineVisualization = { 
+const vis: TimelineVisualization = {
   id: 'rthoyer-dev-vis-timeline',
   label: 'DEV ONLY - Timeline',
-  
+
   options: {
     unit: {
       type: "string",
@@ -46,33 +51,13 @@ const vis: TimelineVisualization = {
   },
 
   create: function (element, config) {
-    // Insert a <style> tag with some styles we'll use later.
-    element.innerHTML = `
-      <style>
-        .hello-world-vis {
-          /* Vertical centering */
-          height: 100%;
-          display: flex;
-          flex-direction: column;
-          justify-content: center;
-          text-align: center;
-        }
-        .hello-world-text-large {
-          font-size: 72px;
-        }
-        .hello-world-text-small {
-          font-size: 18px;
-        }
-      </style>
-    `;
-
     // Create a container element to let us center the text.
-    var container = element.appendChild(document.createElement("div"))
-
-    // Create an element to contain the text.
-    this._timeline = container.appendChild(document.createElement("div"));
-
+    const container = element.appendChild(document.createElement("div"))
+    const vizCanvas = document.createElement('canvas')
+    vizCanvas.setAttribute('id', 'chartjsChart')
+    container.appendChild(vizCanvas)
   },
+
   updateAsync: function (data, element, config, queryResponse, details, done) {
     if (this.addError && this.clearErrors) {
       if (data.length === 0) {
@@ -80,11 +65,11 @@ const vis: TimelineVisualization = {
         return
       }
       else if (queryResponse.fields.dimensions.length == 0) {
-        this.addError({ title: "No Dimensions", message: "This chart requires dimensions." });
+        this.addError({ title: "No Dimensions", message: "This chart requires dimensions." })
         return
       }
-      else if (queryResponse.fields.pivots.length !== 0){
-        this.addError({ title: "Remove Pivot", message: "This chart is incompatible with pivots" });
+      else if (queryResponse.fields.pivots.length !== 0) {
+        this.addError({ title: "Remove Pivot", message: "This chart is incompatible with pivots" })
         return
       }
       else {
@@ -93,14 +78,68 @@ const vis: TimelineVisualization = {
     }
 
     // Grab the first cell of the data
-    var firstRow = data[0]
-    var firstCell = firstRow[queryResponse.fields.dimensions[0].name] as Cell
+    // var firstRow = data[0]
+    // var firstCell = firstRow[queryResponse.fields.dimensions[0].name] as Cell
 
-    // Insert the data into the page
-    this._timeline.innerHTML = LookerCharts.Utils.htmlForCell(firstCell);
+    // // Insert the data into the page
+    // this._timeline.innerHTML = LookerCharts.Utils.htmlForCell(firstCell)
+
+    //const processed_data: ChartData = {
+      const labels = data.map((result) => result[queryResponse.fields.dimensions[0]]).filter((v, i, a) => a.indexOf(v) === i)
+      const actual_data = data.map((result) => ({ y: result[0], dates: [new Date(result[queryResponse.fields.dimensions[1]].value), new Date(result[queryResponse.fields.dimensions[2]].value)] }))
+      const datasets = actual_data.map((item) => ({ data: [item], parsing: { xAxisKey: 'dates' } }))
+      const cfg = {
+        type: lineChartType,
+        data: {
+          labels: labels,
+          datasets: datasets
+        },
+        options: {
+          grouped: false,
+          offset: true,
+          indexAxis: indexAxis,
+          responsive: true,
+          scales: {
+            x: {
+              position: x_scale_position,
+            }
+          }
+        }
+      }
+  
+      const ctx = document.getElementById("chartjsChart") as HTMLCanvasElement
+      const myChart = new Chart(ctx, cfg)
+      done()
+
+    // const chart_config = {
+    //   type: lineChartType,
+    //   data: {
+    //     labels: ['Label 1', 'Label 2', 'Label 3'],
+    //     datasets: [{
+    //       label: "Dataset 1",
+    //       data: [1, 2, 3],
+    //     }]
+    //   },
+    //   indexAxis: 'y',
+    //   responsive: true,
+    //   plugins: [{
+    //     legend: {
+    //       position: 'top',
+    //     },
+    //     title: {
+    //       display: true,
+    //       text: 'Chart.js Floating Bar Chart'
+    //     },
+    //     id: ''
+    //   }]
+    // }
+
+    // new Chart(
+    //   this._timeline,
+    //   chart_config,
+    // ),
 
 
-    // We are done rendering! Let Looker know.
     done()
   }
 }
